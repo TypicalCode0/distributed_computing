@@ -12,7 +12,7 @@ RESULTS="$DIR/results/results_${PROG}_$(date +%Y%m%d_%H%M%S).csv"
 PLOT_SCRIPT="$DIR/plot_results.py"
 
 PROCS=(1 2 3 4 5 6 7 8)
-SAMPLES=(1000000)
+SAMPLES=(1000000 1500000 10000000 15000000 20000000)
 REPEATS=5
 
 if [ ! -f "$LAB_SRC" ]; then

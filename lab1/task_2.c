@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <ctype.h>
 
-// #define DEBUG
+#define DEBUG
 
 const int kRoot = 0;
 
@@ -39,6 +39,9 @@ void PrintVec(double *vec, const int size) {
 
 double MatVecInRowMode(double *mat, double *vec, double *res, const int rows, const int cols,
                        const int my_rank, const int comm_sz) {
+    MPI_Barrier(MPI_COMM_WORLD);
+    double t_start = MPI_Wtime();
+
     int rows_per_process[comm_sz];
     int base = rows / comm_sz;
     int rem = rows % comm_sz;
@@ -59,9 +62,6 @@ double MatVecInRowMode(double *mat, double *vec, double *res, const int rows, co
     for (int process = 1; process < comm_sz; ++process) {
         displs[process] = displs[process - 1] + sendcount[process - 1];
     }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    double t_start = MPI_Wtime();
 
     MPI_Scatterv(mat, sendcount, displs, MPI_DOUBLE, local_mat, sendcount[my_rank], MPI_DOUBLE,
                  kRoot, MPI_COMM_WORLD);
@@ -107,6 +107,9 @@ double MatVecInRowMode(double *mat, double *vec, double *res, const int rows, co
 
 double MatVecInColMode(double *mat, double *vec, double *res, const int rows, const int cols,
                        const int my_rank, const int comm_sz) {
+    MPI_Barrier(MPI_COMM_WORLD);
+    double t_start = MPI_Wtime();
+
     int base = cols / comm_sz;
     int rem = cols % comm_sz;
     int cols_per_process[comm_sz];
@@ -149,9 +152,6 @@ double MatVecInColMode(double *mat, double *vec, double *res, const int rows, co
 #endif
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    double t_start = MPI_Wtime();
-
     double *local_mat = calloc(rows * local_cols, sizeof(double));
     MPI_Scatterv(sendbuf, sendcounts, displs, MPI_DOUBLE, local_mat, rows * local_cols, MPI_DOUBLE,
                  kRoot, MPI_COMM_WORLD);
@@ -190,6 +190,9 @@ double MatVecInColMode(double *mat, double *vec, double *res, const int rows, co
 
 double MatVecInBlockMode(double *mat, double *vec, double *res, const int rows, const int cols,
                          const int my_rank, const int comm_sz) {
+    MPI_Barrier(MPI_COMM_WORLD);
+    double t_start = MPI_Wtime();
+
     // 1. Создание топологии процессов
     // Определяем размеры решетки (p_row x p_col)
     int p_row = 1, p_col = comm_sz;
@@ -199,6 +202,11 @@ double MatVecInBlockMode(double *mat, double *vec, double *res, const int rows, 
             p_col = comm_sz / i;
         }
     }
+#ifdef DEBUG
+    if (my_rank == kRoot) {
+        printf("p_row = %d, p_col = %d\n", p_row, p_col);
+    }
+#endif
 
     // Создаем декартову решетку
     int dims[2] = {p_row, p_col};
@@ -208,6 +216,7 @@ double MatVecInBlockMode(double *mat, double *vec, double *res, const int rows, 
     MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, reorder, &grid_comm);
 
     // Получаем ранг и координаты в новой решетке
+    // так как сделали reorder rank
     int grid_rank;
     int grid_coords[2];
     MPI_Comm_rank(grid_comm, &grid_rank);
@@ -240,28 +249,30 @@ double MatVecInBlockMode(double *mat, double *vec, double *res, const int rows, 
     if (my_rank == kRoot) {
         for (int i = 0; i < p_row; ++i) {
             int block_rows = base_rows + (i < rem_rows ? 1 : 0);
-            int block_start_row = 0;
+            int block_start_row = 0; // смещение
             for (int r = 0; r < i; ++r) {
                 block_start_row += base_rows + (r < rem_rows ? 1 : 0);
             }
             for (int j = 0; j < p_col; ++j) {
-                // Получаем ранг процесса по его координатам, а не вычисляем вручную.
+                // Получаем ранг процесса по его координатам
                 int dest_coords[2] = {i, j};
                 int dest_rank;
                 MPI_Cart_rank(grid_comm, dest_coords, &dest_rank);
 
-                if (dest_rank == kRoot) continue; // Пропускаем отправку самому себе
+                if (dest_rank == kRoot) {
+                    continue;  // Пропускаем отправку самому себе
+                }
 
                 int block_cols = base_cols + (j < rem_cols ? 1 : 0);
-                int block_start_col = 0;
+                int block_start_col = 0; // смещение
                 for (int c = 0; c < j; ++c) {
                     block_start_col += base_cols + (c < rem_cols ? 1 : 0);
                 }
 
-                double *block_buf = malloc(block_rows * block_cols * sizeof(double));
+                double *block_buf = malloc(block_rows * block_cols * sizeof(double)); // буфер в котором данные блока будут идти непрерывно
                 for (int r = 0; r < block_rows; ++r) {
-                    memcpy(block_buf + r * block_cols, 
-                           mat + (block_start_row + r) * cols + block_start_col, 
+                    memcpy(block_buf + r * block_cols,
+                           mat + (block_start_row + r) * cols + block_start_col,
                            block_cols * sizeof(double));
                 }
                 MPI_Send(block_buf, block_rows * block_cols, MPI_DOUBLE, dest_rank, 0, grid_comm);
@@ -270,29 +281,29 @@ double MatVecInBlockMode(double *mat, double *vec, double *res, const int rows, 
         }
         // Копируем блок для самого корневого процесса
         for (int r = 0; r < local_rows; ++r) {
-            memcpy(local_mat + r * local_cols, 
-                   mat + (start_row + r) * cols + start_col, 
+            memcpy(local_mat + r * local_cols, mat + (start_row + r) * cols + start_col,
                    local_cols * sizeof(double));
         }
     } else {
-        MPI_Recv(local_mat, local_rows * local_cols, MPI_DOUBLE, kRoot, 0, grid_comm, MPI_STATUS_IGNORE);
+        MPI_Recv(local_mat, local_rows * local_cols, MPI_DOUBLE, kRoot, 0, grid_comm,
+                 MPI_STATUS_IGNORE);
     }
 
     // 4. Распределение вектора
     // Создаем коммуникаторы для каждого столбца
     MPI_Comm col_comm;
     MPI_Comm_split(grid_comm, my_col, my_row, &col_comm);
-    
+
     // Лидеры столбцов (процессы в первой строке) получают свои части вектора от kRoot
     if (my_row == 0) {
         if (my_rank == kRoot) {
             for (int j = 0; j < p_col; ++j) {
                 int block_cols = base_cols + (j < rem_cols ? 1 : 0);
-                int block_start_col = 0;
+                int block_start_col = 0; // смещение
                 for (int c = 0; c < j; ++c) {
                     block_start_col += base_cols + (c < rem_cols ? 1 : 0);
                 }
-                
+
                 // Получаем ранг процесса-лидера по его координатам.
                 int dest_coords[2] = {0, j};
                 int dest_rank;
@@ -301,13 +312,19 @@ double MatVecInBlockMode(double *mat, double *vec, double *res, const int rows, 
                 if (dest_rank == kRoot) {
                     memcpy(local_vec, vec + block_start_col, block_cols * sizeof(double));
                 } else {
-                    MPI_Send(vec + block_start_col, block_cols, MPI_DOUBLE, dest_rank, 1, grid_comm);
+                    MPI_Send(vec + block_start_col, block_cols, MPI_DOUBLE, dest_rank, 1,
+                             grid_comm);
                 }
             }
         } else {
             MPI_Recv(local_vec, local_cols, MPI_DOUBLE, kRoot, 1, grid_comm, MPI_STATUS_IGNORE);
         }
     }
+#ifdef DEBUG
+    if (my_rank == kRoot) {
+        printf("local_cols = %d\n", local_cols);
+    }
+#endif
 
     // Рассылка (Broadcast) сегмента вектора внутри каждого столбца
     // Лидер столбца (ранг 0 в col_comm) рассылает данные всем остальным.
@@ -345,11 +362,12 @@ double MatVecInBlockMode(double *mat, double *vec, double *res, const int rows, 
             for (int i = 0; i < p_row; ++i) {
                 recvcounts[i] = base_rows + (i < rem_rows ? 1 : 0);
                 if (i > 0) {
-                    displs[i] = displs[i-1] + recvcounts[i-1];
+                    displs[i] = displs[i - 1] + recvcounts[i - 1];
                 }
             }
             // Корень (ранг 0 в col_comm первого столбца) собирает данные.
-            MPI_Gatherv(row_res, local_rows, MPI_DOUBLE, res, recvcounts, displs, MPI_DOUBLE, 0, col_comm);
+            MPI_Gatherv(row_res, local_rows, MPI_DOUBLE, res, recvcounts, displs, MPI_DOUBLE, 0,
+                        col_comm);
             free(recvcounts);
             free(displs);
         } else {
@@ -358,18 +376,21 @@ double MatVecInBlockMode(double *mat, double *vec, double *res, const int rows, 
         }
         free(row_res);
     }
-    
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    double t_end = MPI_Wtime();
+
     // 7. Очистка ресурсов
     free(local_mat);
     free(local_vec);
     free(local_res);
-    
+
     MPI_Comm_free(&row_comm);
     MPI_Comm_free(&col_comm);
     MPI_Comm_free(&grid_comm);
 
     // Замер времени
-    double local_time = MPI_Wtime();
+    double local_time = t_end - t_start;
     double max_time = 0.0;
     MPI_Reduce(&local_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, kRoot, MPI_COMM_WORLD);
     return max_time;
@@ -419,7 +440,8 @@ int main(int argc, char *argv[]) {
             if (!isdigit(argv[2][i])) {
                 if (my_rank == kRoot) {
                     fprintf(stderr,
-                            "Invalid argument: expect positive integer number - dimension of the matrix or rows and cols.\n");
+                            "Invalid argument: expect positive integer number - dimension of the "
+                            "matrix or rows and cols.\n");
                 }
                 MPI_Finalize();
                 return EXIT_FAILURE;
@@ -431,7 +453,8 @@ int main(int argc, char *argv[]) {
         if (rows == 0) {
             if (my_rank == kRoot) {
                 fprintf(stderr,
-                        "Invalid argument: expect positive integer number - dimension of the matrix or rows and cols.\n");
+                        "Invalid argument: expect positive integer number - dimension of the "
+                        "matrix or rows and cols.\n");
             }
             MPI_Finalize();
             return EXIT_FAILURE;
@@ -442,7 +465,8 @@ int main(int argc, char *argv[]) {
             if (!isdigit(argv[3][i])) {
                 if (my_rank == kRoot) {
                     fprintf(stderr,
-                            "Invalid argument: expect positive integer number - dimension of the matrix or rows and cols.\n");
+                            "Invalid argument: expect positive integer number - dimension of the "
+                            "matrix or rows and cols.\n");
                 }
                 MPI_Finalize();
                 return EXIT_FAILURE;
@@ -454,7 +478,8 @@ int main(int argc, char *argv[]) {
         if (rows == 0) {
             if (my_rank == kRoot) {
                 fprintf(stderr,
-                        "Invalid argument: expect positive integer number - dimension of the matrix or rows and cols.\n");
+                        "Invalid argument: expect positive integer number - dimension of the "
+                        "matrix or rows and cols.\n");
             }
             MPI_Finalize();
             return EXIT_FAILURE;

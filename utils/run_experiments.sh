@@ -2,8 +2,6 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-
-
 PROG="task_1"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 LAB_SRC="$DIR/../lab1/${PROG}.c"
@@ -14,6 +12,10 @@ PLOT_SCRIPT="$DIR/plot_results.py"
 PROCS=(1 2 3 4 5 6 7 8)
 SAMPLES=(1000000 1500000 10000000 15000000 20000000)
 REPEATS=5
+
+mkdir -p "$DIR/tmp"
+mkdir -p "$DIR/results"
+mkdir -p "$DIR/graphics"
 
 if [ ! -f "$LAB_SRC" ]; then
   echo "Source $LAB_SRC not found" >&2

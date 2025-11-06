@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <time.h>
 
 // #define DEBUG
 
@@ -190,8 +191,6 @@ double MatVecInColMode(double *mat, double *vec, double *res, const int rows, co
 
 double MatVecInBlockMode(double *mat, double *vec, double *res, const int rows, const int cols,
                          const int my_rank, const int comm_sz) {
-    MPI_Barrier(MPI_COMM_WORLD);
-    double t_start = MPI_Wtime();
 
     // 1. Создание топологии процессов
     // Определяем размеры решетки (p_row x p_col)
@@ -223,6 +222,9 @@ double MatVecInBlockMode(double *mat, double *vec, double *res, const int rows, 
     MPI_Cart_coords(grid_comm, grid_rank, 2, grid_coords);
     int my_row = grid_coords[0];
     int my_col = grid_coords[1];
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    double t_start = MPI_Wtime();
 
     // 2. Расчет локальных размеров и смещений
     int base_rows = rows / p_row;
@@ -434,6 +436,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    srand(time(NULL));
     int rows = rand() % 10, cols = rand() % 10;
     if (argc >= 3) {
         for (uint32_t i = 0; i < strlen(argv[2]); ++i) {

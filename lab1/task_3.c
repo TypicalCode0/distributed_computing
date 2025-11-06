@@ -87,6 +87,8 @@ int main(int argc, char** argv){
             printMatrix(B, n, n);
         }
     }
+    MPI_Barrier(MPI_grid_comm);
+    double start_time = MPI_Wtime();
 
     int *blockA = calloc(local_n*local_n, sizeof(int));
     int *blockB = calloc(local_n*local_n, sizeof(int));
@@ -130,9 +132,6 @@ int main(int argc, char** argv){
     for (int i = 0; i < my_col; i++) {
         MPI_Sendrecv_replace(blockB, local_n*local_n, MPI_INT, up, 0, down, 0, MPI_grid_comm, &status);
     }
-
-    MPI_Barrier(MPI_grid_comm);
-    double start_time = MPI_Wtime();
 
     for (int i = 0; i < sqrt_comm_sz; i++) {
         multiplyCannon(blockA, blockB, blockC, local_n);

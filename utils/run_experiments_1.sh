@@ -9,9 +9,9 @@ BIN="$DIR/tmp_1/${PROG}"
 results_1="$DIR/results_1/results_1_${PROG}_$(date +%Y%m%d_%H%M%S).csv"
 PLOT_SCRIPT="$DIR/plot_results.py"
 
-PROCS=(1 2 3 4 5 6 7 8)
+PROCS=(1 4 8)
 SAMPLES=(1000000 1500000 10000000 15000000 20000000)
-REPEATS=5
+REPEATS=3
 
 mkdir -p "$DIR/tmp_1"
 mkdir -p "$DIR/results_1"

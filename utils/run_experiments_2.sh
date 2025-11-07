@@ -10,7 +10,7 @@ RESULTS="$DIR/results_2/results_${PROG}_$(date +%Y%m%d_%H%M%S).csv"
 PLOT_SCRIPT="$DIR/plot_results.py"
 
 PROCS=(1 4 8)
-SIZES=(5000 10000)
+SIZES=(1000 5000 10000)
 MODES=(row col block)
 REPEATS=3
 

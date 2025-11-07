@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
     int my_rank, comm_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
-    int max_iter = 10000;
+    int max_iter = 100000;
     double tolerance = 1e-6;
 
     if (argc < 2) {

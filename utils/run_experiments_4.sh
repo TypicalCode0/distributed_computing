@@ -18,8 +18,8 @@ LOGDIR="$DIR/logs"
 PLOT_SCRIPT="$DIR/plot_results.py"
 
 # Experiment params (override via env)
-PROCS=(1 2 4 8)
-SIZES=(32 64 128 256)
+PROCS=(1 4 8)
+SIZES=(64 128 256)
 REPEATS=3
 GRID_C="${GRID_C:-0.0}"     # border_val
 MAX_ITER="${MAX_ITER:-100000}"

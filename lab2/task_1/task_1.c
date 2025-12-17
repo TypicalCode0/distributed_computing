@@ -1,9 +1,12 @@
-// компиляция
-// gcc task_1.c -o task_1 -fopenmp -lm
-// запуск
-// ./task_1 1 1000
-// ./run_tests_1.sh
-// python3 plot_graphs_1.py
+/*
+компиляция
+gcc task_1.c -o task_1 -fopenmp -lm
+запуск
+./task_1 1 1000 (пример)
+для тестирования и графиков:
+./run_tests_1.sh
+python3 plot_graphs_1.py
+*/
 
 #include <stdio.h>
 #include <stdlib.h>

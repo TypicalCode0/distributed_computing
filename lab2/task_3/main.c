@@ -120,18 +120,22 @@ void Get_input(int* inserts_in_main_p) {
     printf("How many keys should be inserted in the main thread?\n");
     if (scanf("%d", inserts_in_main_p) != 1) {
         printf("failed to receive input\n");
+        exit(1);
     } 
     printf("How many ops total should be executed?\n");
-    if (scanf("%d", &total_ops) == 1) {
+    if (scanf("%d", &total_ops) != 1) {
         printf("failed to receive input\n");
+        exit(1);
     }
     printf("Percent of ops that should be searches? (between 0 and 1)\n");
-    if (scanf("%lf", &search_percent) == 1) {
+    if (scanf("%lf", &search_percent) != 1) {
         printf("failed to receive input\n");
+        exit(1);
     }
     printf("Percent of ops that should be inserts? (between 0 and 1)\n");
-    if (scanf("%lf", &insert_percent) == 1) {
+    if (scanf("%lf", &insert_percent) != 1) {
         printf("failed to receive input\n");
+        exit(1);
     }
     delete_percent = 1.0 - (search_percent + insert_percent);
 }
